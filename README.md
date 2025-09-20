@@ -47,11 +47,11 @@ Your Local Models
    - Make sure LM Studio server is running on port 1234
 
 3. **Update model configuration:**
-   - Edit `litellm-config.yaml` to match your downloaded models
+   - Edit `config.yaml` to match your downloaded models
 
 4. **Start the proxy:**
    ```bash
-   ./start-proxy-clean.sh
+   ./start.sh
    ```
 
 5. **Configure VS Code GitHub Copilot:**
@@ -69,7 +69,7 @@ For optimal tool calling performance:
 
 ## Configuration
 
-### Model Configuration (`litellm-config.yaml`)
+### Model Configuration (`config.yaml`)
 
 Add your models following this pattern:
 
@@ -91,9 +91,9 @@ model_list:
 
 ## Files
 
-- `custom_oai2ollama.py` - Core proxy that converts between Ollama and OpenAI API formats
-- `litellm-config.yaml` - Model configuration and routing
-- `start-proxy-clean.sh` - Main startup script
+- `proxy.py` - Core proxy that converts between Ollama and OpenAI API formats
+- `config.yaml` - Model configuration 
+- `start.sh` - Main startup script
 - `requirements.txt` - Python dependencies
 
 ## Troubleshooting

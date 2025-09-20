@@ -30,7 +30,7 @@ pkill -f "litellm.*port.*4000" 2>/dev/null || true
 pkill -f "oai2ollama.*11434" 2>/dev/null || true
 
 echo "🚀 Starting LiteLLM proxy on port 4000..."
-litellm --config litellm-config.yaml --port 4000 &
+litellm --config config.yaml --port 4000 &
 LITELLM_PID=$!
 echo "Started LiteLLM with PID $LITELLM_PID"
 sleep 3
