@@ -9,6 +9,10 @@ Dockerfile
 docker-compose.yml
 .dockerignore
 
+# Build and test scripts
+build.sh
+test-docker.sh
+
 # Environment and development
 .env
 .env.*
@@ -55,3 +59,6 @@ build/
 # Documentation (not needed in container)
 docs/
 DOCKER_PLAN.md
+
+# CI/CD
+.github/
