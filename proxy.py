@@ -12,9 +12,12 @@ from typing import Dict, Any
 
 app = FastAPI()
 
-# Configuration (same as original oai2ollama)
-API_KEY = "dummy"
-BASE_URL = "http://localhost:4000"
+import os
+from datetime import datetime, timezone
+
+# Configuration (read from env to avoid fragile runtime sed replacements)
+API_KEY = os.environ.get("API_KEY", "dummy")
+BASE_URL = os.environ.get("LITELLM_BASE_URL", "http://localhost:4000")
 CAPABILITIES = ["completion", "tools", "insert", "embedding"]
 
 def _new_client():
@@ -30,8 +33,8 @@ def _new_streaming_client():
     return httpx.AsyncClient(
         base_url=BASE_URL,
         headers={"Authorization": f"Bearer {API_KEY}"},
-        timeout=300,  # 5 minutes for streaming
-        follow_redirects=True
+        timeout=int(os.environ.get("STREAM_TIMEOUT", "300")),  # configurable via env
+        follow_redirects=True,
     )
 
 @app.get("/api/tags")
@@ -126,7 +129,7 @@ async def chat_completions_ollama(request: Request):
                                     # Convert OpenAI streaming format to Ollama format
                                     ollama_chunk = {
                                         "model": data.get("model"),
-                                        "created_at": "2025-01-01T00:00:00Z",  # Static for now
+                                        "created_at": datetime.now(timezone.utc).isoformat(),
                                         "done": False
                                     }
 
@@ -153,7 +156,7 @@ async def chat_completions_ollama(request: Request):
                 # Return a proper error message if streaming fails
                 error_response = {
                     "model": data.get("model"),
-                    "created_at": "2025-01-01T00:00:00Z",
+                    "created_at": datetime.now(timezone.utc).isoformat(),
                     "done": True,
                     "error": f"Streaming failed: {str(e)}"
                 }

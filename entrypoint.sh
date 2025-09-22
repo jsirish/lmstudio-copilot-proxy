@@ -170,17 +170,11 @@ main() {
     # Start custom proxy (using our enhanced proxy.py instead of oai2ollama package)
     log "🚀 Starting custom Ollama-compatible proxy on port ${OLLAMA_PORT}..."
 
-    # Update proxy.py configuration dynamically
-    sed -i "s|BASE_URL = \"http://localhost:4000\"|BASE_URL = \"http://localhost:${LITELLM_PORT}\"|g" /app/proxy.py
-    sed -i "s|API_KEY = \"dummy\"|API_KEY = \"${API_KEY:-dummy}\"|g" /app/proxy.py
+    # Start the custom proxy. proxy.py reads configuration from environment variables.
+    export LITELLM_BASE_URL="http://localhost:${LITELLM_PORT}"
+    export API_KEY="${API_KEY:-dummy}"
 
-    python -c "
-import sys
-sys.path.append('/app')
-from proxy import app
-import uvicorn
-uvicorn.run(app, host='0.0.0.0', port=${OLLAMA_PORT})
-" &
+    python -c "import sys; sys.path.append('/app'); from proxy import app; import uvicorn; uvicorn.run(app, host='0.0.0.0', port=${OLLAMA_PORT})" &
     CUSTOM_PROXY_PID=$!
     log "Started custom proxy with PID $CUSTOM_PROXY_PID"
 

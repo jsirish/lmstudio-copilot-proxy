@@ -75,22 +75,13 @@ main() {
     
     # Test 1: Check if Ollama API endpoint responds
     log "🔍 Testing Ollama API endpoint..."
-    if curl -s -f "http://localhost:$OLLAMA_PORT/api/tags" > /dev/null; then
+    if response=$(curl --fail-with-body -sS "http://localhost:$OLLAMA_PORT/api/tags" 2>&1); then
         log "✅ Ollama API endpoint is responding"
     else
-        warn "⚠️ Ollama API endpoint not responding (may be normal if LM Studio is not running)"
-        
-        # Check if it's a connection error vs. LM Studio not available
-        response=$(curl -s -w "%{http_code}" "http://localhost:$OLLAMA_PORT/api/tags" -o /dev/null || echo "000")
-        if [[ "$response" == "000" ]]; then
-            error "❌ Cannot connect to Ollama API endpoint"
-            echo ""
-            log "📋 Container logs:"
-            docker logs --tail 20 "$CONTAINER_NAME"
-            exit 1
-        else
-            log "ℹ️ Endpoint reachable but LM Studio may not be available (HTTP $response)"
-        fi
+        warn "⚠️ Ollama API endpoint not responding: $response"
+        log "📋 Container logs:"
+        docker logs --tail 20 "$CONTAINER_NAME"
+        exit 1
     fi
     
     # Test 2: Check if LiteLLM API endpoint responds
