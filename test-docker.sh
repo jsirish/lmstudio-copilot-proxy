@@ -44,10 +44,10 @@ main() {
     log "   - Container: $CONTAINER_NAME"
     log "   - Ollama Port: $OLLAMA_PORT"
     log "   - LiteLLM Port: $LITELLM_PORT"
-    
+
     # Clean up any existing test container
     cleanup
-    
+
     # Start the container
     log "🚀 Starting test container..."
     docker run -d \
@@ -57,11 +57,11 @@ main() {
         -e LMSTUDIO_URL=http://host.docker.internal:1234 \
         -e LOG_LEVEL=INFO \
         "$IMAGE_NAME"
-    
+
     # Wait for container to start
     log "⏳ Waiting ${WAIT_TIME}s for container to initialize..."
     sleep "$WAIT_TIME"
-    
+
     # Check if container is running
     if ! docker ps | grep -q "$CONTAINER_NAME"; then
         error "❌ Container failed to start or exited"
@@ -70,20 +70,33 @@ main() {
         docker logs "$CONTAINER_NAME" 2>&1 || true
         exit 1
     fi
-    
+
     log "✅ Container is running"
-    
+
     # Test 1: Check if Ollama API endpoint responds
     log "🔍 Testing Ollama API endpoint..."
-    if response=$(curl --fail-with-body -sS "http://localhost:$OLLAMA_PORT/api/tags" 2>&1); then
-        log "✅ Ollama API endpoint is responding"
+    # Portable curl check: prefer --fail-with-body if available, otherwise fall back
+    if curl --version | grep -q "--fail-with-body" 2>/dev/null; then
+        if response=$(curl --fail-with-body -sS "http://localhost:$OLLAMA_PORT/api/tags" 2>&1); then
+            log "✅ Ollama API endpoint is responding"
+        else
+            warn "⚠️ Ollama API endpoint not responding: $response"
+            log "📋 Container logs:"
+            docker logs --tail 20 "$CONTAINER_NAME"
+            exit 1
+        fi
     else
-        warn "⚠️ Ollama API endpoint not responding: $response"
-        log "📋 Container logs:"
-        docker logs --tail 20 "$CONTAINER_NAME"
-        exit 1
+        if curl -sS -f "http://localhost:$OLLAMA_PORT/api/tags" > /dev/null; then
+            log "✅ Ollama API endpoint is responding"
+        else
+            response=$(curl -sS "http://localhost:$OLLAMA_PORT/api/tags" 2>&1 || true)
+            warn "⚠️ Ollama API endpoint not responding: $response"
+            log "📋 Container logs:"
+            docker logs --tail 20 "$CONTAINER_NAME"
+            exit 1
+        fi
     fi
-    
+
     # Test 2: Check if LiteLLM API endpoint responds
     log "🔍 Testing LiteLLM API endpoint..."
     if curl -s -f "http://localhost:$LITELLM_PORT/health" > /dev/null; then
@@ -93,7 +106,7 @@ main() {
         response=$(curl -s -w "%{http_code}" "http://localhost:$LITELLM_PORT/health" -o /dev/null || echo "000")
         log "ℹ️ LiteLLM HTTP response: $response"
     fi
-    
+
     # Test 3: Check container health
     log "🔍 Checking container health status..."
     health_status=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER_NAME" 2>/dev/null || echo "no-health-check")
@@ -104,7 +117,7 @@ main() {
     else
         warn "⚠️ Container health check: $health_status"
     fi
-    
+
     # Test 4: Check for error logs
     log "🔍 Checking for errors in container logs..."
     error_count=$(docker logs "$CONTAINER_NAME" 2>&1 | grep -i error | wc -l || echo "0")
@@ -116,19 +129,19 @@ main() {
         log "📋 Recent error messages:"
         docker logs "$CONTAINER_NAME" 2>&1 | grep -i error | tail -5 || true
     fi
-    
+
     # Test 5: Resource usage
     log "🔍 Checking resource usage..."
     stats=$(docker stats --no-stream --format "table {{.MemUsage}}\t{{.CPUPerc}}" "$CONTAINER_NAME" | tail -1)
     memory=$(echo "$stats" | awk '{print $1}')
     cpu=$(echo "$stats" | awk '{print $2}')
     log "📊 Resource usage: Memory: $memory, CPU: $cpu"
-    
+
     # Display container logs for debugging
     echo ""
     log "📋 Recent container logs:"
     docker logs --tail 10 "$CONTAINER_NAME" 2>&1 || true
-    
+
     echo ""
     log "✅ Docker container test completed!"
     echo ""
@@ -137,7 +150,7 @@ main() {
     log "   2. Load a model in LM Studio"
     log "   3. Configure VS Code with endpoint: http://localhost:$OLLAMA_PORT"
     log "   4. Test with: curl http://localhost:$OLLAMA_PORT/api/tags"
-    
+
     echo ""
     log "🛑 To stop the test container: docker stop $CONTAINER_NAME"
 }

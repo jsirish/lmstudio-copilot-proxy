@@ -174,7 +174,9 @@ main() {
     export LITELLM_BASE_URL="http://localhost:${LITELLM_PORT}"
     export API_KEY="${API_KEY:-dummy}"
 
-    python -c "import sys; sys.path.append('/app'); from proxy import app; import uvicorn; uvicorn.run(app, host='0.0.0.0', port=${OLLAMA_PORT})" &
+    # Start uvicorn in a maintainable way and ensure /app is on PYTHONPATH
+    export PYTHONPATH="/app:$PYTHONPATH"
+    python -m uvicorn proxy:app --host 0.0.0.0 --port ${OLLAMA_PORT} &
     CUSTOM_PROXY_PID=$!
     log "Started custom proxy with PID $CUSTOM_PROXY_PID"
 

@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 # Configuration (read from env to avoid fragile runtime sed replacements)
 API_KEY = os.environ.get("API_KEY", "dummy")
 BASE_URL = os.environ.get("LITELLM_BASE_URL", "http://localhost:4000")
+USE_HTTP2 = os.environ.get("USE_HTTP2", "false").lower() == "true"
 CAPABILITIES = ["completion", "tools", "insert", "embedding"]
 
 def _new_client():
@@ -25,7 +26,8 @@ def _new_client():
         base_url=BASE_URL,
         headers={"Authorization": f"Bearer {API_KEY}"},
         timeout=60,
-        follow_redirects=True
+        follow_redirects=True,
+        http2=USE_HTTP2,
     )
 
 def _new_streaming_client():
@@ -35,6 +37,7 @@ def _new_streaming_client():
         headers={"Authorization": f"Bearer {API_KEY}"},
         timeout=int(os.environ.get("STREAM_TIMEOUT", "300")),  # configurable via env
         follow_redirects=True,
+        http2=USE_HTTP2,
     )
 
 @app.get("/api/tags")
