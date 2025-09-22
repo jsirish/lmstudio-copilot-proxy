@@ -9,11 +9,16 @@ import json
 import httpx
 import asyncio
 from typing import Dict, Any
+import logging
 
 app = FastAPI()
 
 import os
 from datetime import datetime, timezone
+
+# Configure logging so exceptions show up in container logs with tracebacks
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Configuration (read from env to avoid fragile runtime sed replacements)
 API_KEY = os.environ.get("API_KEY", "dummy")
@@ -39,6 +44,34 @@ def _new_streaming_client():
         follow_redirects=True,
         http2=USE_HTTP2,
     )
+
+
+def _truncate_messages(messages, max_chars: int = 20000):
+    """Simple left-truncation by character length to avoid blowing past model context.
+
+    This is a heuristic (characters != tokens) but is cheap and prevents extremely
+    large payloads from reaching LiteLLM / LM Studio which can cause mid-stream
+    failures when the context is far larger than the loaded model's context window.
+    """
+    if not messages:
+        return messages
+
+    msgs = list(messages)
+    total = sum(len((m.get("content") or "")) for m in msgs if isinstance(m, dict))
+    # If messages are plain strings, fall back to total length of joined string
+    if total == 0 and isinstance(messages, list):
+        joined = "".join([m if isinstance(m, str) else json.dumps(m) for m in msgs])
+        if len(joined) <= max_chars:
+            return msgs
+        # crude fallback: keep only the last portion
+        truncated = joined[-max_chars:]
+        return [{"role": "system", "content": truncated}]
+
+    while msgs and total > max_chars:
+        removed = msgs.pop(0)
+        total -= len((removed.get("content") or "")) if isinstance(removed, dict) else 0
+
+    return msgs
 
 @app.get("/api/tags")
 async def models():
@@ -73,6 +106,9 @@ async def chat_completions_openai(request: Request):
     if data.get("stream", False):
         async def stream():
             try:
+                # Truncate messages heuristically before streaming to avoid exceeding model context
+                data["messages"] = _truncate_messages(data.get("messages", []))
+
                 async with _new_streaming_client() as client:
                     async with client.stream("POST", "/chat/completions", json=data) as response:
                         async for chunk in response.aiter_bytes():
@@ -118,6 +154,9 @@ async def chat_completions_ollama(request: Request):
         async def stream():
             try:
                 async with _new_streaming_client() as client:
+                    # Truncate messages heuristically before streaming to avoid exceeding model context
+                    openai_data["messages"] = _truncate_messages(openai_data.get("messages", []))
+
                     async with client.stream("POST", "/chat/completions", json=openai_data) as response:
                         async for chunk in response.aiter_lines():
                             if chunk.startswith("data: "):
@@ -156,19 +195,30 @@ async def chat_completions_ollama(request: Request):
                                 except json.JSONDecodeError:
                                     continue
             except Exception as e:
-                # Return a proper error message if streaming fails
+                # Log the full exception with traceback for diagnostics
+                logger.exception("Streaming failed for model %s", data.get("model"))
+
+                # Ensure the streamed error includes the exception message (truncated)
+                exc_text = str(e) or "<no message>"
+                if len(exc_text) > 1000:
+                    exc_text = exc_text[:1000] + "...[truncated]"
+
                 error_response = {
                     "model": data.get("model"),
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     "done": True,
-                    "error": f"Streaming failed: {str(e)}"
+                    "error": f"Streaming failed: {exc_text}"
                 }
                 yield f'data: {json.dumps(error_response)}\n\n'
 
         return StreamingResponse(stream(), media_type="text/event-stream")
     else:
+
         # Non-streaming
         async with _new_client() as client:
+            # Truncate messages heuristically to avoid exceeding model context
+            openai_data["messages"] = _truncate_messages(openai_data.get("messages", []))
+
             res = await client.post("/chat/completions", json=openai_data)
             res.raise_for_status()
             openai_response = res.json()
@@ -176,7 +226,7 @@ async def chat_completions_ollama(request: Request):
             # Convert OpenAI format to Ollama format
             ollama_response = {
                 "model": data.get("model"),
-                "created_at": "2025-01-01T00:00:00Z",
+                "created_at": datetime.now(timezone.utc).isoformat(),
                 "done": True,
                 "message": {
                     "role": "assistant",
