@@ -22,7 +22,15 @@ def _new_client():
         base_url=BASE_URL,
         headers={"Authorization": f"Bearer {API_KEY}"},
         timeout=60,
-        http2=True,
+        follow_redirects=True
+    )
+
+def _new_streaming_client():
+    """Client with longer timeout for streaming requests"""
+    return httpx.AsyncClient(
+        base_url=BASE_URL,
+        headers={"Authorization": f"Bearer {API_KEY}"},
+        timeout=300,  # 5 minutes for streaming
         follow_redirects=True
     )
 
@@ -58,9 +66,21 @@ async def chat_completions_openai(request: Request):
 
     if data.get("stream", False):
         async def stream():
-            async with _new_client() as client, client.stream("POST", "/chat/completions", json=data) as response:
-                async for chunk in response.aiter_bytes():
-                    yield chunk
+            try:
+                async with _new_streaming_client() as client:
+                    async with client.stream("POST", "/chat/completions", json=data) as response:
+                        async for chunk in response.aiter_bytes():
+                            yield chunk
+            except Exception as e:
+                # Return a proper error message if streaming fails
+                error_response = {
+                    "error": {
+                        "message": f"Streaming failed: {str(e)}",
+                        "type": "stream_error",
+                        "code": "stream_error"
+                    }
+                }
+                yield f"data: {json.dumps(error_response)}\n\n"
         return StreamingResponse(stream(), media_type="text/event-stream")
     else:
         async with _new_client() as client:
@@ -90,44 +110,54 @@ async def chat_completions_ollama(request: Request):
 
     if data.get("stream", False):
         async def stream():
-            async with _new_client() as client:
-                async with client.stream("POST", "/chat/completions", json=openai_data) as response:
-                    async for chunk in response.aiter_lines():
-                        if chunk.startswith("data: "):
-                            chunk_data = chunk[6:]
-                            if chunk_data.strip() == "[DONE]":
-                                # Convert OpenAI [DONE] to Ollama format
-                                yield f'data: {json.dumps({"model": data.get("model"), "done": True})}\n\n'
-                                break
+            try:
+                async with _new_streaming_client() as client:
+                    async with client.stream("POST", "/chat/completions", json=openai_data) as response:
+                        async for chunk in response.aiter_lines():
+                            if chunk.startswith("data: "):
+                                chunk_data = chunk[6:]
+                                if chunk_data.strip() == "[DONE]":
+                                    # Convert OpenAI [DONE] to Ollama format
+                                    yield f'data: {json.dumps({"model": data.get("model"), "done": True})}\n\n'
+                                    break
 
-                            try:
-                                openai_chunk = json.loads(chunk_data)
-                                # Convert OpenAI streaming format to Ollama format
-                                ollama_chunk = {
-                                    "model": data.get("model"),
-                                    "created_at": "2025-01-01T00:00:00Z",  # Static for now
-                                    "done": False
-                                }
+                                try:
+                                    openai_chunk = json.loads(chunk_data)
+                                    # Convert OpenAI streaming format to Ollama format
+                                    ollama_chunk = {
+                                        "model": data.get("model"),
+                                        "created_at": "2025-01-01T00:00:00Z",  # Static for now
+                                        "done": False
+                                    }
 
-                                if "choices" in openai_chunk and len(openai_chunk["choices"]) > 0:
-                                    choice = openai_chunk["choices"][0]
-                                    if "delta" in choice:
-                                        delta = choice["delta"]
-                                        if "content" in delta:
-                                            ollama_chunk["message"] = {
-                                                "role": "assistant",
-                                                "content": delta["content"]
-                                            }
-                                        if "tool_calls" in delta:
-                                            ollama_chunk["message"] = {
-                                                "role": "assistant",
-                                                "content": "",
-                                                "tool_calls": delta["tool_calls"]
-                                            }
+                                    if "choices" in openai_chunk and len(openai_chunk["choices"]) > 0:
+                                        choice = openai_chunk["choices"][0]
+                                        if "delta" in choice:
+                                            delta = choice["delta"]
+                                            if "content" in delta:
+                                                ollama_chunk["message"] = {
+                                                    "role": "assistant",
+                                                    "content": delta["content"]
+                                                }
+                                            if "tool_calls" in delta:
+                                                ollama_chunk["message"] = {
+                                                    "role": "assistant",
+                                                    "content": "",
+                                                    "tool_calls": delta["tool_calls"]
+                                                }
 
-                                yield f'data: {json.dumps(ollama_chunk)}\n\n'
-                            except json.JSONDecodeError:
-                                continue
+                                    yield f'data: {json.dumps(ollama_chunk)}\n\n'
+                                except json.JSONDecodeError:
+                                    continue
+            except Exception as e:
+                # Return a proper error message if streaming fails
+                error_response = {
+                    "model": data.get("model"),
+                    "created_at": "2025-01-01T00:00:00Z",
+                    "done": True,
+                    "error": f"Streaming failed: {str(e)}"
+                }
+                yield f'data: {json.dumps(error_response)}\n\n'
 
         return StreamingResponse(stream(), media_type="text/event-stream")
     else:

@@ -21,8 +21,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org && \
     pip install --no-cache-dir -r requirements.txt --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
 
-# Install oai2ollama (not in requirements.txt based on start.sh)
-RUN pip install --no-cache-dir oai2ollama --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
+# Note: We use our custom proxy.py instead of oai2ollama package
 
 # Stage 2: Runtime image with minimal footprint
 FROM python:3.11-slim
