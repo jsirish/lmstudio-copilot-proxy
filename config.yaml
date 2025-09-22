@@ -1,47 +1,82 @@
 # LiteLLM configuration for LM Studio proxy
 model_list:
-  - model_name: qwen2.5-coder-7b-q5
+  - model_name: qwen2.5-coder-7b-instruct
     litellm_params:
       model: openai/qwen2.5-coder-7b-instruct
-      api_base: http://localhost:1234/v1
+      api_base: http://host.docker.internal:1234/v1
       api_key: dummy
+      timeout: 300
+      stream_timeout: 300
 
   - model_name: qwen2.5-7b-instruct
     litellm_params:
       model: openai/qwen2.5-7b-instruct
-      api_base: http://localhost:1234/v1
+      api_base: http://host.docker.internal:1234/v1
       api_key: dummy
+      timeout: 300
+      stream_timeout: 300
 
   - model_name: mistral-7b-instruct-v0.3
     litellm_params:
       model: openai/mistralai_-_mistral-7b-instruct-v0.3
-      api_base: http://localhost:1234/v1
+      api_base: http://host.docker.internal:1234/v1
       api_key: dummy
+      timeout: 300
+      stream_timeout: 300
 
-  - model_name: gpt-oss-20b-gguf
+  - model_name: hermes-3-llama-3.1-8b
     litellm_params:
-      model: openai/gpt-oss-20b
-      api_base: http://localhost:1234/v1
+      model: openai/hermes-3-llama-3.1-8b
+      api_base: http://host.docker.internal:1234/v1
       api_key: dummy
+      timeout: 300
+      stream_timeout: 300
+
+  - model_name: gpt-oss-20b-unsloth
+    litellm_params:
+      model: openai/unsloth/gpt-oss-20b
+      api_base: http://host.docker.internal:1234/v1
+      api_key: dummy
+      timeout: 300
+      stream_timeout: 300
+
+  - model_name: gpt-oss-20b-openai
+    litellm_params:
+      model: openai/openai/gpt-oss-20b
+      api_base: http://host.docker.internal:1234/v1
+      api_key: dummy
+      timeout: 300
+      stream_timeout: 300
 
   - model_name: starcoderbase-7b
     litellm_params:
       model: openai/bigcode.starcoderbase-7b
-      api_base: http://localhost:1234/v1
+      api_base: http://host.docker.internal:1234/v1
       api_key: dummy
+      timeout: 300
+      stream_timeout: 300
 
-  # Add hermes when you download it
-  # - model_name: hermes-3-8b
-  #   litellm_params:
-  #     model: openai/hermes-3-llama-3.1-8b
-  #     api_base: http://localhost:1234/v1
-  #     api_key: dummy
+  - model_name: nomic-embed-text-v1.5
+    litellm_params:
+      model: openai/text-embedding-nomic-embed-text-v1.5
+      api_base: http://host.docker.internal:1234/v1
+      api_key: dummy
+      timeout: 300
+      stream_timeout: 300
 
 # LiteLLM server settings (no database for simplicity)
 general_settings:
   master_key: dummy
+  request_timeout: 300  # 5 minutes for all requests
+  max_retries: 2
+  default_timeout: 300
+  default_stream_timeout: 300
 
 # Disable callbacks to avoid dependency issues
 litellm_settings:
   success_callback: []
   failure_callback: []
+  request_timeout: 300
+  num_retries: 2
+  default_timeout: 300
+  stream_timeout: 300

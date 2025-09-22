@@ -1,0 +1,64 @@
+# Git
+.git
+.gitignore
+README.md
+LICENSE
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Build and test scripts
+build.sh
+test-docker.sh
+
+# Environment and development
+.env
+.env.*
+venv/
+node_modules/
+
+# Logs and cache
+logs/
+*.log
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.cache/
+.pytest_cache/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Documentation (not needed in container)
+docs/
+DOCKER_PLAN.md
+
+# CI/CD
+.github/

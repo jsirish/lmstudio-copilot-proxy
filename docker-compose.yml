@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  lmstudio-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "11434:11434"  # Ollama API endpoint for VS Code
+      - "4000:4000"    # LiteLLM API endpoint
+    environment:
+      # Core Configuration
+      - LMSTUDIO_URL=${LMSTUDIO_URL:-http://host.docker.internal:1234}
+      - LITELLM_PORT=${LITELLM_PORT:-4000}
+      - OLLAMA_PORT=${OLLAMA_PORT:-11434}
+      - API_KEY=${API_KEY:-dummy}
+      
+      # Advanced Configuration
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-30}
+      - GRACEFUL_SHUTDOWN_TIMEOUT=${GRACEFUL_SHUTDOWN_TIMEOUT:-10}
+      - MODEL_REFRESH_INTERVAL=${MODEL_REFRESH_INTERVAL:-300}
+      
+      # Development Overrides
+      - DEV_MODE=${DEV_MODE:-false}
+      - HOT_RELOAD=${HOT_RELOAD:-false}
+      - DEBUG_LOGGING=${DEBUG_LOGGING:-false}
+    volumes:
+      # Custom configuration (optional)
+      - ./config.yaml:/app/config.yaml:ro
+      # Log persistence (optional)
+      - ./logs:/app/logs
+      # Cache directory for dependencies
+      - ./.cache:/app/.cache
+    networks:
+      - lmstudio-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  lmstudio-network:
+    driver: bridge
+
+# Optional: For development with hot-reload
+volumes:
+  cache:
+    driver: local
